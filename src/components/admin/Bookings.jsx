@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FaPlus, FaPen } from "react-icons/fa";
+import { FaPen } from "react-icons/fa";
 import { LuDelete } from "react-icons/lu";
 import { HiDotsHorizontal } from "react-icons/hi";
 import axios from "axios";
@@ -11,6 +11,7 @@ const Bookings = () => {
   const [reservations, setReservations] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedConfirmation, setSelectedConfirmation] = useState({});
 
   const today = new Date();
 
@@ -53,6 +54,10 @@ const Bookings = () => {
     setActiveHeading(heading);
   };
 
+  const handleConfirmationChange = (id, value) => {
+    setSelectedConfirmation((prev) => ({ ...prev, [id]: value }));
+  };
+
   const fileInputRef = useRef(null);
 
   const handleUploadClick = () => {
@@ -65,6 +70,23 @@ const Bookings = () => {
       console.log("Selected Pdf file");
     } else {
       alert("Please select a valid PDF file.");
+    }
+  };
+
+  // Function to update the status of the booking
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await axios.put(`${base_url}/reservation/${id}`, { status: newStatus });
+      // Update the local state after status is changed
+      setReservations((prevReservations) =>
+        prevReservations.map((reservation) =>
+          reservation._id === id
+            ? { ...reservation, status: newStatus }
+            : reservation
+        )
+      );
+    } catch (error) {
+      console.error("Error updating status", error);
     }
   };
 
@@ -114,6 +136,12 @@ const Bookings = () => {
                   Date & Time
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                  Booking Confirmation
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
+                  Booking Complete
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">
                   Actions
                 </th>
               </tr>
@@ -145,7 +173,9 @@ const Bookings = () => {
                           ? "bg-green-500 text-white"
                           : item.status === "cancelled"
                           ? "bg-red-500 text-white"
-                          : "bg-yellow-500 text-white"
+                          : item.status === "pending"
+                          ? "bg-yellow-500 text-white"
+                          : "bg-gray-500 text-white"
                       }`}
                     >
                       {item.status}
@@ -154,6 +184,37 @@ const Bookings = () => {
                   <td className="px-4 py-4 text-sm text-gray-500">
                     {new Date(item.createdAt).toLocaleString()}
                   </td>
+
+                  {/* Booking Confirmation Column */}
+                  <td className="px-4 py-4 text-sm text-gray-500">
+                    {(item.status === "pending" || item.status === "cancelled") && (
+                      <select
+                        value={selectedConfirmation[item._id] || ""}
+                        onChange={(e) =>
+                          handleConfirmationChange(item._id, e.target.value)
+                        }
+                        className="px-3 py-2 border rounded-md"
+                      >
+                        <option value="">Select Action</option>
+                        <option value="decline">Decline</option>
+                        <option value="waitlist">Waitlist</option>
+                      </select>
+                    )}
+                  </td>
+
+                  {/* Booking Complete Column */}
+                  <td className="px-4 py-4 text-sm text-gray-500">
+                    {item.status === "confirmed" && (
+                      <button
+                        className="px-3 py-2 bg-green-500 text-white rounded-md"
+                        onClick={() => handleStatusChange(item._id, "completed")}
+                      >
+                        Submit
+                      </button>
+                    )}
+                  </td>
+
+                  {/* Actions Column */}
                   <td className="px-4 py-4 flex gap-3">
                     <button className="text-gray-500 hover:text-gray-900">
                       <FaPen />
@@ -171,7 +232,6 @@ const Bookings = () => {
                       >
                         <FaUpload />
                       </button>
-
                       <input
                         type="file"
                         ref={fileInputRef}
